@@ -346,6 +346,6 @@ if uploaded_files:
         st.download_button(
             label="📥 Download Extracted Summary (.docx)",
             data=output_buffer,
-            file_name="Extracted_Summary.docx",
+            file_name="Lampiran 2 Pindaan raw.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
