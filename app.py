@@ -320,7 +320,7 @@ def build_summary_doc(records):
 # --- Streamlit UI ---
 st.set_page_config(page_title="Document Extractor", page_icon="📄", layout="centered")
 
-st.title("📄 Word Document Data Extractor")
+st.title("📄 Pindaan to Lampiran 2 Extractor")
 st.write("Upload your Word documents (.docx) below to extract data into a 2-column Word table.")
 
 uploaded_files = st.file_uploader(
