@@ -275,20 +275,19 @@ def build_summary_doc(records):
         first_paragraph_used = False
         for line in lines:
             clean_line = line.strip()
-            if not clean_line:
-                continue
             
-            # Create a new paragraph line to prevent them from running together
+            # Create the paragraph structure regardless of whether the line has text
             if not first_paragraph_used:
                 p_right = row_cells[1].paragraphs[0]
                 first_paragraph_used = True
             else:
                 p_right = row_cells[1].add_paragraph()
             
-            p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            
-            # Just print the line exactly as it was extracted
-            format_styled_text_run(p_right, clean_line)
+            # If the line contains text, justify and format it.
+            # If the line is empty (from an extra \n), it will just leave a blank paragraph space.
+            if clean_line:
+                p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                format_styled_text_run(p_right, clean_line)
 
     buffer = io.BytesIO()
     doc.save(buffer)
