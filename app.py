@@ -280,19 +280,21 @@ def build_summary_doc(records):
         first_paragraph_used = False
         for line in lines:
             clean_line = line.strip()
+            if not clean_line:
+                continue
             
-            # Create a new paragraph line to prevent them from running together
             if not first_paragraph_used:
                 p_right = row_cells[1].paragraphs[0]
                 first_paragraph_used = True
             else:
                 p_right = row_cells[1].add_paragraph()
             
-            # If the line contains text, justify and format it.
-            # If the line is empty (from the \n\n), it leaves a visible blank line.
-            if clean_line:
-                p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                format_styled_text_run(p_right, clean_line)
+            p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            
+            # ADD THIS LINE to create an "Enter" space after each paragraph
+            p_right.paragraph_format.space_after = Pt(8) 
+            
+            format_styled_text_run(p_right, clean_line)
 
     buffer = io.BytesIO()
     doc.save(buffer)
