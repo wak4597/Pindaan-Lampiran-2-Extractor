@@ -136,10 +136,10 @@ def extract_field_data(doc):
                 
                 # --- 4. Isu / Ulasan (Single Block Extraction) ---
                 
-                # Parse the 3rd column (index 2) paragraph by paragraph to preserve list structure
-                cell_2_3 = row_2_cells[2]
+                # Parse the 4th column (index 3) paragraph by paragraph to preserve list structure
+                cell_2_4 = row_2_cells[3]
                 cell_text_parts = []
-                for p in cell_2_3.paragraphs:
+                for p in cell_2_4.paragraphs:
                     text = p.text.strip()
                     if text:
                         style_name = p.style.name if p.style else ""
@@ -150,12 +150,12 @@ def extract_field_data(doc):
                         else:
                             cell_text_parts.append(text)
                             
-                cell_2_3_text = "\n".join(cell_text_parts)
+                cell_2_4_text = "\n".join(cell_text_parts)
                 
                 # Regex: Capture from "Permohonan" to the end of the line containing "tarikh pindaan bermula"
                 isu_match = re.search(
                     r'(Permohonan[\s\S]*?tarikh pindaan bermula[^\n\r]*)', 
-                    cell_2_3_text, 
+                    cell_2_4_text, 
                     re.IGNORECASE
                 )
                 
@@ -163,7 +163,7 @@ def extract_field_data(doc):
                     data["isu_ulasan"] = isu_match.group(1).strip()
                 else:
                     # Fallback to the whole cell text if the exact phrase isn't found
-                    data["isu_ulasan"] = cell_2_3_text
+                    data["isu_ulasan"] = cell_2_4_text
                 
                 break # Stop searching tables once the target is processed
 
