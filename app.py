@@ -270,13 +270,18 @@ def build_summary_doc(records):
 
         # --- Right Column ---
         right_text = data.get('isu_ulasan', '')
+        
+        # Force a double newline specifically before "Tarikh pindaan bermula"
+        # \s* removes existing spacing so it doesn't accidentally create 3 or 4 spaces
+        right_text = re.sub(r'\s*(Tarikh pindaan)', r'\n\n\1', right_text, flags=re.IGNORECASE)
+        
         lines = right_text.split('\n')
         
         first_paragraph_used = False
         for line in lines:
             clean_line = line.strip()
             
-            # Create the paragraph structure regardless of whether the line has text
+            # Create a new paragraph line to prevent them from running together
             if not first_paragraph_used:
                 p_right = row_cells[1].paragraphs[0]
                 first_paragraph_used = True
@@ -284,7 +289,7 @@ def build_summary_doc(records):
                 p_right = row_cells[1].add_paragraph()
             
             # If the line contains text, justify and format it.
-            # If the line is empty (from an extra \n), it will just leave a blank paragraph space.
+            # If the line is empty (from the \n\n), it leaves a visible blank line.
             if clean_line:
                 p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 format_styled_text_run(p_right, clean_line)
