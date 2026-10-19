@@ -134,22 +134,9 @@ def extract_field_data(doc):
                     data["nama_premis"] = lines[0]
                     data["alamat_premis"] = " ".join(lines[1:])
                 
-                # --- 4. Isu / Ulasan ---
+                # --- 4. Isu / Ulasan (Single Block Extraction) ---
                 
-                # 4a. Keputusan (2nd Row, 4th Column -> Extract Bold Text Only)
-                cell_2_4 = row_2_cells[3]
-                keputusan_parts = []
-                for p in cell_2_4.paragraphs:
-                    for run in p.runs:
-                        if run.bold and run.text.strip():
-                            keputusan_parts.append(run.text.strip())
-                keputusan = " ".join(keputusan_parts).strip()
-                
-                if not keputusan:  # Fallback if no bold formatting was natively used
-                    keputusan = cell_2_4.text.split('\n')[0].strip()
-                
-                # 4b. Butiran Permohonan (2nd Row, 3rd Column)
-                # Parse paragraph by paragraph to preserve list structure
+                # Parse the 3rd column (index 2) paragraph by paragraph to preserve list structure
                 cell_2_3 = row_2_cells[2]
                 cell_text_parts = []
                 for p in cell_2_3.paragraphs:
@@ -164,27 +151,19 @@ def extract_field_data(doc):
                             cell_text_parts.append(text)
                             
                 cell_2_3_text = "\n".join(cell_text_parts)
-                # Slice from "Permohonan:" up to "Ulasan/Pemerhatian:"
-                butiran_match = re.search(r'Permohonan:\s*([\s\S]*?)(?=Ulasan\s*/\s*Pemerhatian:|$)', cell_2_3_text, re.IGNORECASE)
-                butiran = butiran_match.group(1).strip() if butiran_match else cell_2_3_text
-
-                # 4c. Tarikh Pindaan (End Row, 4th Column)
-                end_row_cells = []
-                seen_end = set()
-                for cell in table.rows[-1].cells:
-                    if cell._tc not in seen_end:
-                        seen_end.add(cell._tc)
-                        end_row_cells.append(cell)
-                        
-                tarikh = ""
-                if len(end_row_cells) >= 4:
-                    end_cell_text = end_row_cells[3].text.strip()
-                    tarikh_match = re.search(r'(Tarikh pindaan bermula[\s\S]*)', end_cell_text, re.IGNORECASE)
-                    tarikh = tarikh_match.group(1).strip() if tarikh_match else end_cell_text
-
-                # Combine Keputusan, Butiran, and Tarikh into one block
-                isu_parts = [keputusan, butiran, tarikh]
-                data["isu_ulasan"] = "\n".join([p for p in isu_parts if p])
+                
+                # Regex: Capture from "Permohonan" to the end of the line containing "tarikh pindaan bermula"
+                isu_match = re.search(
+                    r'(Permohonan[\s\S]*?tarikh pindaan bermula[^\n\r]*)', 
+                    cell_2_3_text, 
+                    re.IGNORECASE
+                )
+                
+                if isu_match:
+                    data["isu_ulasan"] = isu_match.group(1).strip()
+                else:
+                    # Fallback to the whole cell text if the exact phrase isn't found
+                    data["isu_ulasan"] = cell_2_3_text
                 
                 break # Stop searching tables once the target is processed
 
