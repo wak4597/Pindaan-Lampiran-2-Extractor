@@ -53,10 +53,9 @@ CUSTOM_ENGLISH_WORDS = {
     "only", "oxygen", "policies", "procedures", "progress", "protocol", "proven", "psychiatric", "ramp", "red", "response", "standard", "stem", "therapeutic", "trial", "value", "wardrobe", "yellow", "zone"
 }
 
-
 # --- Extractor ---
 def extract_field_data(doc):
-    """Extracts fields using positional table coordinates and targeted regex."""
+    """Extracts fields using positional table coordinates and tracks dynamic XML numbering."""
     data = {
         "nama_premis": "",
         "alamat_premis": "",
@@ -87,12 +86,12 @@ def extract_field_data(doc):
                     
     full_document_text = "\n".join(sequential_lines)
 
-    # 2. No. Fail (Matches KKM87/A2/... with or without Jilid)
+    # 2. No. Fail
     fail_match = re.search(r'(KKM[\s/]*87/A2/[A-Za-z0-9/.-]+(?:[\s]*JILID[\s]*\d+)?)', full_document_text, re.IGNORECASE)
     if fail_match:
         data["no_fail"] = fail_match.group(1).strip()
 
-    # 3. Pegawai Proses (Captures name directly, retaining Dr./KJ prefixes)
+    # 3. Pegawai Proses
     pegawai_match = re.search(r'Pegawai\s*Proses[\s:\|]*([^\n\r\|]+)', full_document_text, re.IGNORECASE)
     if pegawai_match:
         data["pegawai_proses"] = pegawai_match.group(1).strip()
@@ -100,8 +99,6 @@ def extract_field_data(doc):
     # --- Step 2: Positional Extraction for Table Data ---
     for table in doc.tables:
         if len(table.rows) >= 2:
-            
-            # Safely get actual columns of the 2nd row (index 1), skipping merged cell duplicates
             row_2_cells = []
             seen_cells = set()
             for cell in table.rows[1].cells:
@@ -109,39 +106,95 @@ def extract_field_data(doc):
                     seen_cells.add(cell._tc)
                     row_2_cells.append(cell)
             
-            # Ensure it's the right table (at least 4 columns)
             if len(row_2_cells) >= 4:
-                
-                # --- 1. Nama Premis & Alamat Premis (2nd Row, 2nd Column) ---
+                # --- 1. Nama Premis & Alamat Premis ---
                 cell_2_2_text = row_2_cells[1].text.strip()
                 premis_match = re.search(r'([\s\S]*?)(?=Pemohon:)', cell_2_2_text, re.IGNORECASE)
                 raw_premis_alamat = premis_match.group(1).strip() if premis_match else cell_2_2_text
                 
-                # Split Nama (First Line) and Alamat (Remaining Lines)
                 lines = [line.strip() for line in raw_premis_alamat.split('\n') if line.strip()]
                 if lines:
                     data["nama_premis"] = lines[0]
                     data["alamat_premis"] = " ".join(lines[1:])
                 
-                # --- 4. Isu / Ulasan (Single Block Extraction) ---
-                
-                # Parse the 4th column (index 3) paragraph by paragraph to preserve list structure
+                # --- 4. Isu / Ulasan (With Dynamic Number/Bullet Tracking) ---
+                # The details that always need numbering are in the 4th column (index 3).
                 cell_2_4 = row_2_cells[3]
                 cell_text_parts = []
+                
+                list_counters = {}
+                last_ilvl = -1
+                
                 for p in cell_2_4.paragraphs:
                     text = p.text.strip()
-                    if text:
-                        style_name = p.style.name if p.style else ""
-                        if 'Number' in style_name:
-                            cell_text_parts.append(f"1. {text}")
-                        elif 'List' in style_name or 'Bullet' in style_name:
-                            cell_text_parts.append(f"• {text}")
+                    if not text:
+                        continue
+                        
+                    is_bullet = False
+                    is_number = False
+                    ilvl = 0
+                    
+                    style_name = p.style.name if p.style else ""
+                    if 'Bullet' in style_name:
+                        is_bullet = True
+                        
+                    # Check XML for native MS Word list formatting properties
+                    num_pr = p._element.xpath('.//w:numPr')
+                    if num_pr:
+                        ilvl_nodes = p._element.xpath('.//w:ilvl/@w:val')
+                        if ilvl_nodes:
+                            ilvl = int(ilvl_nodes[0])
+                        if not is_bullet:
+                            is_number = True
+                    elif 'Number' in style_name or 'List' in style_name:
+                        if not is_bullet:
+                            is_number = True
+                        if p.paragraph_format.left_indent:
+                            # Estimate indent level if not explicitly in XML
+                            ilvl = int(p.paragraph_format.left_indent.pt // 18)
+
+                    indent_space = "    " * ilvl
+                    
+                    # Safety check: if text is manually typed as a list (e.g., "1. ", "a) ") avoid double numbering
+                    if re.match(r'^([a-zA-Z0-9]+[\.\)]|[-•])\s', text):
+                        # Reset tracking if user manually forced a new main numbered list
+                        if re.match(r'^1[\.\)]\s', text):
+                            list_counters = {}
+                        cell_text_parts.append(f"{indent_space}{text}")
+                        continue
+                        
+                    if is_bullet:
+                        cell_text_parts.append(f"{indent_space}• {text}")
+                    elif is_number:
+                        # Reset deeper levels if we returned to a higher list level
+                        if ilvl < last_ilvl:
+                            for level in list(list_counters.keys()):
+                                if level > ilvl:
+                                    list_counters[level] = 0
+                                    
+                        # Increment current list level counter
+                        list_counters[ilvl] = list_counters.get(ilvl, 0) + 1
+                        last_ilvl = ilvl
+                        val = list_counters[ilvl]
+                        
+                        # Apply appropriate numbering format based on indentation depth
+                        if ilvl == 0:
+                            prefix = f"{val}."
+                        elif ilvl == 1:
+                            prefix = f"{chr(96 + val) if val <= 26 else val}."
+                        elif ilvl == 2:
+                            roman = ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]
+                            prefix = f"{roman[val]}." if val <= 10 else f"{val}."
                         else:
-                            cell_text_parts.append(text)
+                            prefix = f"{val}."
+                            
+                        cell_text_parts.append(f"{indent_space}{prefix} {text}")
+                    else:
+                        cell_text_parts.append(text)
                             
                 cell_2_4_text = "\n".join(cell_text_parts)
                 
-                # Regex: Capture from "Permohonan" to the end of the line containing "tarikh pindaan bermula"
+                # Regex capture block
                 isu_match = re.search(
                     r'(Permohonan[\s\S]*?tarikh pindaan bermula[^\n\r]*)', 
                     cell_2_4_text, 
@@ -151,10 +204,9 @@ def extract_field_data(doc):
                 if isu_match:
                     data["isu_ulasan"] = isu_match.group(1).strip()
                 else:
-                    # Fallback to the whole cell text if the exact phrase isn't found
                     data["isu_ulasan"] = cell_2_4_text
                 
-                break # Stop searching tables once the target is processed
+                break 
 
     return data
 
@@ -223,19 +275,16 @@ def build_summary_doc(records):
         # --- Left Column ---
         p_left = row_cells[0].paragraphs[0]
         
-        # 1. Nama Premis (Bold, no label)
         val_premis = p_left.add_run(f"{data.get('nama_premis', '')}\n")
         val_premis.font.name = 'Arial'
         val_premis.font.size = Pt(9)
         val_premis.bold = True
 
-        # 2. Alamat Premis (Value only, no label)
         val_alamat = p_left.add_run(f"{data.get('alamat_premis', '')}\n")
         val_alamat.font.name = 'Arial'
         val_alamat.font.size = Pt(9)
         val_alamat.bold = False
 
-        # 3. No. Fail (Label + Value)
         lbl_fail = p_left.add_run("No. Fail: ")
         lbl_fail.font.name = 'Arial'
         lbl_fail.font.size = Pt(9)
@@ -246,7 +295,6 @@ def build_summary_doc(records):
         val_fail.font.size = Pt(9)
         val_fail.bold = False
 
-        # 4. Pegawai Proses (Label + Value)
         lbl_pegawai = p_left.add_run("Pegawai Proses: ")
         lbl_pegawai.font.name = 'Arial'
         lbl_pegawai.font.size = Pt(9)
@@ -260,15 +308,15 @@ def build_summary_doc(records):
         # --- Right Column ---
         right_text = data.get('isu_ulasan', '')
         
-        # Force a double newline specifically before "Tarikh pindaan bermula"
-        # \s* removes existing spacing so it doesn't accidentally create 3 or 4 spaces
         right_text = re.sub(r'\s*(Tarikh pindaan)', r'\n\n\1', right_text, flags=re.IGNORECASE)
-        
         lines = right_text.split('\n')
         
         first_paragraph_used = False
         for line in lines:
-            clean_line = line.strip()
+            if not line.strip():
+                if first_paragraph_used:
+                    row_cells[1].add_paragraph()
+                continue
             
             if not first_paragraph_used:
                 p_right = row_cells[1].paragraphs[0]
@@ -276,10 +324,26 @@ def build_summary_doc(records):
             else:
                 p_right = row_cells[1].add_paragraph()
             
-            # If the line is empty, it just leaves the paragraph blank (like an Enter)
-            if clean_line:
-                p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                format_styled_text_run(p_right, clean_line)
+            p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            
+            # Map injected spaces into native MS Word indentation properties
+            leading_spaces = len(line) - len(line.lstrip())
+            indent_level = leading_spaces // 4
+            
+            clean_text = line.lstrip() 
+            
+            # Check for list prefix to apply hanging indent
+            # Matches formats like "1. ", "a. ", "i. ", "• ", "- "
+            list_match = re.match(r'^([a-zA-Z0-9]+[\.\)]|[•\-])\s', clean_text)
+            
+            if list_match:
+                # Apply hanging indent for lists to match the 4th column layout perfectly
+                p_right.paragraph_format.left_indent = Pt(18 * indent_level + 18)
+                p_right.paragraph_format.first_line_indent = Pt(-18)
+            elif indent_level > 0:
+                p_right.paragraph_format.left_indent = Pt(18 * indent_level)
+            
+            format_styled_text_run(p_right, clean_text)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -316,6 +380,6 @@ if uploaded_files:
         st.download_button(
             label="📥 Download Extracted Summary (.docx)",
             data=output_buffer,
-            file_name="Lampiran 2 Pindaan raw.docx",
+            file_name="Lampiran_2_Pindaan_raw.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
