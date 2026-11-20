@@ -318,32 +318,52 @@ def build_summary_doc(records):
                     row_cells[1].add_paragraph()
                 continue
             
-            if not first_paragraph_used:
-                p_right = row_cells[1].paragraphs[0]
-                first_paragraph_used = True
-            else:
-                p_right = row_cells[1].add_paragraph()
-            
-            p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            
-            # Map injected spaces into native MS Word indentation properties
             leading_spaces = len(line) - len(line.lstrip())
             indent_level = leading_spaces // 4
-            
             clean_text = line.lstrip() 
             
-            # Check for list prefix to apply hanging indent
-            # Matches formats like "1. ", "a. ", "i. ", "• ", "- "
+            # Check for list prefix (e.g., "1. ", "a. ", "i. ", "• ", "- ")
             list_match = re.match(r'^([a-zA-Z0-9]+[\.\)]|[•\-])\s', clean_text)
             
             if list_match:
-                # Apply hanging indent for lists to match the 4th column layout perfectly
-                p_right.paragraph_format.left_indent = Pt(18 * indent_level + 18)
-                p_right.paragraph_format.first_line_indent = Pt(-18)
-            elif indent_level > 0:
-                p_right.paragraph_format.left_indent = Pt(18 * indent_level)
-            
-            format_styled_text_run(p_right, clean_text)
+                bullet_str = list_match.group(1)
+                content_str = clean_text[len(list_match.group(0)):]
+                
+                # Create a borderless nested table for perfect list alignment
+                nested_table = row_cells[1].add_table(rows=1, cols=2)
+                nested_table.autofit = False
+                
+                cell_bullet = nested_table.cell(0, 0)
+                cell_content = nested_table.cell(0, 1)
+                
+                # Force widths to keep bullet compact and left-aligned
+                cell_bullet.width = Pt(25 + (15 * indent_level))
+                
+                # Format the Number/Bullet cell
+                p_bullet = cell_bullet.paragraphs[0]
+                p_bullet.paragraph_format.left_indent = Pt(15 * indent_level)
+                run_bullet = p_bullet.add_run(bullet_str)
+                run_bullet.font.name = 'Arial'
+                run_bullet.font.size = Pt(9)
+                
+                # Format the Content cell
+                p_content = cell_content.paragraphs[0]
+                p_content.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                format_styled_text_run(p_content, content_str)
+                
+                first_paragraph_used = True
+            else:
+                if not first_paragraph_used:
+                    p_right = row_cells[1].paragraphs[0]
+                    first_paragraph_used = True
+                else:
+                    p_right = row_cells[1].add_paragraph()
+                
+                p_right.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                if indent_level > 0:
+                    p_right.paragraph_format.left_indent = Pt(18 * indent_level)
+                
+                format_styled_text_run(p_right, clean_text)
 
     buffer = io.BytesIO()
     doc.save(buffer)
