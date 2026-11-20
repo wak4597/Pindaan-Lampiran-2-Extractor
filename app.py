@@ -355,8 +355,15 @@ def build_summary_doc(records):
 # --- Streamlit UI ---
 st.set_page_config(page_title="Document Extractor", page_icon="📄", layout="centered")
 
-st.title("📄 Pindaan to Lampiran 2 Extractor")
-st.write("Upload your Word documents (.docx) below to extract data into a 2-column Word table.")
+st.title("📄 Buat senarai Lampiran 2 bagi Pindaan B2/10 & Lesen")
+with st.expander("📖 Cara Guna", expanded=False): # Change to True if you want it open by default
+    st.markdown("""
+    1. Pastikan semua fail Word disimpan dalam format **`.docx`**.
+    2. Muat naik fail anda di ruangan yang disediakan di bawah.
+    3. Klik butang **Proses** dan tunggu sehingga selesai.
+    4. Muat turun fail hasil yang telah dijana.
+    5. edit format, spacing dan ayat jadi standard lepas tu copy paste dalam Lampiran 2
+    """)
 
 uploaded_files = st.file_uploader(
     "Choose Word files (.docx only)",
