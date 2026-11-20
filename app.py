@@ -50,7 +50,8 @@ CUSTOM_ENGLISH_WORDS = {
     "uroflowmetry", "utility", "vacant", "vascular", "vertigo", "vestibular", "vision", "visiting", "visitor", "visual", "volunteer", "wait", "waiting", "ward", "waste", "wax", "wheelchair",
     "wing", "with", "women's", "work", "x-ray", "airlock", "auditory", "autologous", "baby", "basis", "brainstem", "breast", "cancers", "cell", "chamber", "clinically", "committee", "disabled",
     "electrophysiology", "endocrine", "enhancement", "ethical", "execute", "formula", "green", "hearing", "hyperbaric", "immune", "institutional", "main", "marketing", "multiplace", "nourishment",
-    "only", "oxygen", "policies", "procedures", "progress", "protocol", "proven", "psychiatric", "ramp", "red", "response", "standard", "stem", "therapeutic", "trial", "value", "wardrobe", "yellow", "zone"
+    "only", "oxygen", "policies", "procedures", "progress", "protocol", "proven", "psychiatric", "ramp", "red", "response", "standard", "stem", "therapeutic", "trial", "value", "wardrobe", "yellow", "zone",
+    "gynae-oncology", "pet/ct", "spect/ct/pet"
 }
 
 # --- Extractor ---
