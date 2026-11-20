@@ -238,7 +238,8 @@ def format_styled_text_run(paragraph, text):
             if is_bold:
                 run.bold = True
             
-            clean_word = re.sub(r'[^\w]', '', sub).lower()
+            # Preserve hyphens and apostrophes during the lookup clean up
+            clean_word = re.sub(r'[^\w\-\']', '', sub).lower()
             if clean_word in CUSTOM_ENGLISH_WORDS and not is_bold:
                 run.italic = True
 
